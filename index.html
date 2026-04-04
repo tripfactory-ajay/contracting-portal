@@ -284,7 +284,7 @@ tr:hover td{background:#FAFAF8}
         <div style="position:relative;height:90px;overflow:hidden"><img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&q=60" style="width:100%;height:100%;object-fit:cover"><div style="position:absolute;bottom:0;left:0;right:0;padding:6px 8px;background:linear-gradient(transparent,rgba(0,0,0,0.65));font-size:10px;font-weight:600;color:#fff;letter-spacing:0.5px">Amsterdam</div></div>
       </div>
       <div class="card">
-        <div class="card-header"><div class="card-title">Hotel list</div><button class="add-btn" onclick="openModal('hotel')">+ Add hotel</button></div>
+        <div class="card-header"><div class="card-title">Hotel list</div><button class="add-btn" onclick="editingHotelId=null;document.getElementById('hotelModalTitle').textContent='🏨 Add hotel';document.getElementById('hotelSaveBtn').textContent='Save hotel';['h_name','h_location','h_chain','h_contact','h_website','h_notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('h_tier').value='Flagship';document.getElementById('h_status').value='Not contacted';openModal('hotel')">+ Add hotel</button></div>
         <div class="filter-row">
           <input class="search-input" id="hotelSearch" placeholder="Search by name or location..." oninput="renderHotels()">
           <select class="filter-select" id="hotelChainFilter" onchange="renderHotels()"><option value="">All chains</option></select>
@@ -437,7 +437,7 @@ tr:hover td{background:#FAFAF8}
 <!-- ═══ HOTEL MODAL ═══ -->
 <div class="modal-overlay" id="hotelModal">
   <div class="modal">
-    <div class="modal-title">🏨 Add hotel</div>
+    <div class="modal-title" id="hotelModalTitle">🏨 Add hotel</div>
     <div class="f2">
       <div class="form-row"><label>Property name *</label><input id="h_name" placeholder="e.g. InterContinental London Park Lane"></div>
       <div class="form-row"><label>Location *</label><input id="h_location" placeholder="e.g. London, UK"></div>
@@ -453,8 +453,8 @@ tr:hover td{background:#FAFAF8}
     <div class="form-row"><label>Website</label><input id="h_website" placeholder="https://..."></div>
     <div class="form-row"><label>Notes</label><textarea id="h_notes" style="min-height:70px" placeholder="Commercial terms, FAM trip, rate details, follow-up info..."></textarea></div>
     <div class="modal-footer">
-      <button class="cancel-btn" onclick="closeModal('hotel')">Cancel</button>
-      <button class="save-btn" onclick="saveHotel()">Save hotel</button>
+      <button class="cancel-btn" onclick="closeHotelModal()">Cancel</button>
+      <button class="save-btn" id="hotelSaveBtn" onclick="saveHotel()">Save hotel</button>
     </div>
   </div>
 </div>
@@ -514,7 +514,7 @@ tr:hover td{background:#FAFAF8}
 <script>
 const USERS={Ajay:{initials:'AK',bg:'rgba(27,111,216,0.12)',color:'#1B6FD8'},Raj:{initials:'RJ',bg:'rgba(58,181,74,0.12)',color:'#1A6B30'},Manish:{initials:'MS',bg:'rgba(244,121,32,0.12)',color:'#8B4500'}};
 const PW='TFEU2026';
-let currentUser=null,selectedUser=null,hotels,actions,meetings,nextId,editingActionId=null;
+let currentUser=null,selectedUser=null,hotels,actions,meetings,nextId,editingActionId=null,editingHotelId=null;
 
 /* ─── SEED DATA ─── */
 const IH=[
@@ -691,9 +691,12 @@ function renderHotels(){
     <td style="vertical-align:middle"><span class="tag">${h.chain}</span></td>
     <td style="vertical-align:middle">${tb(h.tier)}</td>
     <td style="vertical-align:middle"><select class="ss" onchange="updateHotelStatus(${h.id},this.value)">${['Not contacted','Contacted','Negotiating','Signed'].map(s=>`<option${s===h.status?' selected':''}>${s}</option>`).join('')}</select></td>
-    <td style="font-size:12px;color:#555;white-space:nowrap;vertical-align:middle">${h.contact||'—'}</td>
-    <td style="font-size:12px;color:#888;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" title="${h.notes}">${h.notes||'—'}</td>
-    <td style="vertical-align:middle"><button class="del-btn" onclick="deleteHotel(${h.id})">×</button></td>
+    <td style="font-size:12px;color:#555;white-space:nowrap;vertical-align:middle;cursor:pointer" title="Click to edit contact" onclick="inlineEditHotelField(${h.id},'contact',this)">${h.contact||'<span style="color:#ccc">+ add contact</span>'}</td>
+    <td style="font-size:12px;color:#888;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;cursor:pointer" title="${h.notes||'Click to add notes'}" onclick="inlineEditHotelField(${h.id},'notes',this)">${h.notes||'<span style="color:#ccc">+ add note</span>'}</td>
+    <td style="vertical-align:middle;white-space:nowrap">
+      <button class="ic-btn" onclick="openEditHotel(${h.id})" style="margin-right:4px">✏️ Edit</button>
+      <button class="del-btn" onclick="deleteHotel(${h.id})">×</button>
+    </td>
   </tr>`).join(''):'<tr><td colspan="8" class="empty-state">No hotels match filters</td></tr>';
 }
 function updateHotelStatus(id,val){const h=hotels.find(x=>x.id===id);if(h){h.status=val;saveData();renderDashboard();}}
@@ -833,11 +836,49 @@ function renderDashboard(){
 function renderAll(){renderDashboard();renderHotels();renderActions();renderMeetings();}
 
 /* ─── SAVE FUNCTIONS ─── */
+function openEditHotel(id){
+  const h=hotels.find(x=>x.id===id);if(!h)return;
+  editingHotelId=id;
+  document.getElementById('hotelModalTitle').textContent='✏️ Edit hotel';
+  document.getElementById('hotelSaveBtn').textContent='Update hotel';
+  document.getElementById('h_name').value=h.name;
+  document.getElementById('h_location').value=h.location;
+  document.getElementById('h_chain').value=h.chain;
+  document.getElementById('h_tier').value=h.tier;
+  document.getElementById('h_status').value=h.status;
+  document.getElementById('h_contact').value=h.contact||'';
+  document.getElementById('h_website').value=h.website||'';
+  document.getElementById('h_notes').value=h.notes||'';
+  document.getElementById('hotelModal').style.display='flex';
+}
+function closeHotelModal(){
+  editingHotelId=null;
+  document.getElementById('hotelModalTitle').textContent='🏨 Add hotel';
+  document.getElementById('hotelSaveBtn').textContent='Save hotel';
+  closeModal('hotel');
+}
 function saveHotel(){
   const name=document.getElementById('h_name').value.trim();if(!name){alert('Property name required');return;}
-  hotels.push({id:nextId++,name,location:document.getElementById('h_location').value.trim(),chain:document.getElementById('h_chain').value.trim()||'Independent',tier:document.getElementById('h_tier').value,status:document.getElementById('h_status').value,contact:document.getElementById('h_contact').value.trim(),website:document.getElementById('h_website').value.trim(),notes:document.getElementById('h_notes').value.trim()});
-  saveData();populateChainFilter();renderHotels();renderDashboard();closeModal('hotel');
+  const obj={name,location:document.getElementById('h_location').value.trim(),chain:document.getElementById('h_chain').value.trim()||'Independent',tier:document.getElementById('h_tier').value,status:document.getElementById('h_status').value,contact:document.getElementById('h_contact').value.trim(),website:document.getElementById('h_website').value.trim(),notes:document.getElementById('h_notes').value.trim()};
+  if(editingHotelId){
+    const h=hotels.find(x=>x.id===editingHotelId);if(h)Object.assign(h,obj);
+    editingHotelId=null;
+  }else{
+    hotels.push({id:nextId++,...obj});
+  }
+  saveData();populateChainFilter();renderHotels();renderDashboard();closeHotelModal();
   ['h_name','h_location','h_chain','h_contact','h_website','h_notes'].forEach(id=>document.getElementById(id).value='');
+}
+function inlineEditHotelField(id,field,cell){
+  const h=hotels.find(x=>x.id===id);if(!h)return;
+  const cur=h[field]||'';
+  const inp=document.createElement('input');
+  inp.value=cur;
+  inp.style.cssText='width:100%;font-size:12px;padding:2px 5px;border:1px solid #1B6FD8;border-radius:4px;outline:none';
+  cell.innerHTML='';cell.appendChild(inp);inp.focus();inp.select();
+  const save=()=>{h[field]=inp.value.trim();saveData();renderHotels();};
+  inp.addEventListener('blur',save);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')save();if(e.key==='Escape')renderHotels();});
 }
 
 function saveAction(){
